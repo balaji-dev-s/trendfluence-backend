@@ -1,31 +1,23 @@
-// ================= IMPORTS =================
-
 // basic server
 import express from "express";
-
 // database connection
 import mongoose from "mongoose";
-
 // read .env variables
 import dotenv from "dotenv";
-
 // allow frontend to talk to backend
 import cors from "cors";
-
 // password hashing
 import bcrypt from "bcryptjs";
-
 // login token (JWT)
 import jwt from "jsonwebtoken";
-
 // read cookies from browser
 import cookieParser from "cookie-parser";
-
 // user database model
 import User from "./models/User.js";
+//customer db model
+import Customer from "./models/Customer.js";
 
 dotenv.config();
-
 const app = express();
 
 
@@ -38,13 +30,9 @@ app.use(cors({
 }));
 
 // fix browser preflight (important for login requests)
-
 app.options(/.*/, cors());
-
-
 // allow JSON data from frontend
 app.use(express.json());
-
 // allow reading cookies
 app.use(cookieParser());
 
@@ -160,6 +148,43 @@ app.post("/auth/logout", (req, res) => {
     res.json({ msg: "Logged out" });
 });
 
+//Add customers
+app.post("/customers", async (req, res) => {
+    try {
+        const { name, phone, address } = req.body;
+        if (!name || !phone) return res.status(400).json({ msg: "Name and phone required" });
+        const customer = await Customer.create({ name, phone, address });
+        res.status(201).json(customer);
+    } catch (err) { res.status(500).json({ msg: "Server error" }); }
+});
+
+// Get customers with search
+app.get("/customers", async (req, res) => {
+    try {
+        const { search } = req.query;
+        let query = {};
+        if (search) {
+            query = { $or: [{ name: { $regex: search, $options: "i" } }, { phone: { $regex: search, $options: "i" } }] };
+        }
+        const customers = await Customer.find(query).sort({ createdAt: -1 });
+        res.json(customers);
+    } catch (err) { res.status(500).json({ msg: "Server error" }); }
+});
+
+// Update customer
+app.put("/customers/:id", async (req, res) => {
+    try {
+        const { name, phone, address } = req.body;
+        const updated = await Customer.findByIdAndUpdate(req.params.id, { name, phone, address }, { new: true });
+        res.json(updated);
+    } catch (err) { res.status(500).json({ msg: "Server error" }); }
+});
+
+// Delete customer
+app.delete("/customers/:id", async (req, res) => {
+    try { await Customer.findByIdAndDelete(req.params.id); res.json({ msg: "Customer deleted" }); }
+    catch (err) { res.status(500).json({ msg: "Server error" }); }
+});
 
 // ================= START SERVER =================
 
@@ -169,3 +194,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log("🚀 Server running on port " + PORT);
 });
+
